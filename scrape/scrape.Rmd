@@ -1,0 +1,199 @@
+---
+title: "ifaa"
+author: "Kiera Gibson"
+date: "2024-07-17"
+output: html_document
+---
+
+```{r}
+install.packages("dplyr")
+install.packages("rvest")
+install.packages("tidyr")
+install.packages("stringr")
+install.packages("httr")
+install.packages("ggplot2")
+install.packages("xml2")
+install.packages("curl")
+library(dplyr)
+library(rvest)
+library(tidyr)
+library(stringr)
+library(httr)
+library(ggplot2)
+library(xml2)
+library(curl)
+```
+
+```{r}
+ds_programs_df <- read_html("page/Degree Programs in Analytics and Data Science – Master of Science in Analytics _ Institute for Advanced Analytics.html")
+
+#Program names table
+raw_df <- ds_programs_df %>%
+html_elements("p") %>%
+html_text() %>%
+as_tibble() %>%
+  filter(row_number() %in% c(7:360))
+
+#URLs table, shorter than raw_df so can't merge as is, a few programs do not have a URL
+website_df <- ds_programs_df %>%
+html_elements("a") %>%
+html_attr("href") %>%
+as_tibble() %>%
+  filter(row_number() %in% c(61:410))
+```
+
+```{r}
+#View (4) programs without a URL from raw_df
+str_subset(raw_df$value, "(pending|ceased|ended)")
+
+#Save row numbers under 'position' for adding the above programs back in order later
+raw_df <- raw_df %>% mutate(position = row_number())
+
+#Separate raw_df into institution and program columns, creating ds_programs_df
+ds_programs_df <- raw_df %>%
+  separate_wider_delim(cols = value, delim = regex("(, | |,)(?=M\\.|Ph\\.|Master|Specialized|Professional Master)"), names = c("institution", "program"), too_many = "merge")
+
+#Merge website_df into ds_programs_df, then add and sort the removed programs
+ds_programs_df <- filter(ds_programs_df, !str_detect(program, "(pending|ceased|ended)")) %>%
+  mutate("website" = website_df$value) %>% full_join(ds_programs_df) %>% arrange(position)
+
+#(Optional) Remove position column
+ds_programs_df <- select(ds_programs_df, !position)
+```
+
+```{r}
+#Add year column
+ds_programs_df <- ds_programs_df %>% mutate("year" = 2007)
+
+ds_programs_df$year[2:3] = "2010"
+ds_programs_df$year[4:7] = "2011"
+ds_programs_df$year[8:16] = "2012"
+ds_programs_df$year[17:33] = "2013"
+ds_programs_df$year[34:72] = "2014"
+ds_programs_df$year[73:113] = "2015"
+ds_programs_df$year[114:159] = "2016"
+ds_programs_df$year[160:208] = "2017"
+ds_programs_df$year[209:247] = "2018"
+ds_programs_df$year[248:279] = "2019"
+ds_programs_df$year[280:299] = "2020"
+ds_programs_df$year[300:319] = "2021"
+ds_programs_df$year[320:352] = "2022"
+ds_programs_df$year[353:354] = "2023"
+
+ds_programs_df <- mutate(ds_programs_df, "year" = as.factor(ds_programs_df$year))
+```
+
+```{r}
+#Ideally these steps would be reversed (removing former names and then separating into degree and field) in the case that there's a program that changed name AND degree. But that case doesn't happen here, and I don't want to rewrite the regex to make it work when I don't need to.
+
+#Separate programs into degree and field
+ds_programs_df <- ds_programs_df %>%
+  separate_wider_delim(cols = program, delim = regex("([Ii]n |of )"), names = c("degree", "field"), too_many = "merge", cols_remove = FALSE)
+
+#remove former names inside parentheses
+ds_programs_df$field <- ds_programs_df$field %>%
+  str_remove(regex("( \\([Ff]ormer.+)")) %>% str_remove(regex("( \\(Degree name change: former.+)")) %>%
+  str_remove(regex("( \\([Pp]revious.+)")) %>% str_remove(regex("( \\([Mm]oved.+)")) %>%
+  str_remove(regex("( \\([Cc]eased.+)"))
+
+#remove former names outside parentheses
+ds_programs_df$field <- ds_programs_df$field %>%
+  str_remove(regex("(.+[Rr]enamed the )")) %>%
+  str_remove(regex("(.+[Rr]enamed )")) %>%
+  str_remove(regex("(.+[Cc]hanged to )")) %>%
+  str_remove(regex("( in 2.+)")) %>%
+  str_remove(regex("(M.S[.] in )")) %>%
+  str_remove(regex("( in July.+)"))
+
+#cleaning
+unique(as.factor(ds_programs_df$field))
+ds_programs_df$field <- ds_programs_df$field %>% str_replace_all(c("Data Analytics and Policy\\)" = "Data Analytics and Policy", "\\." = "", " - " = " & ", " – " = " & ", " / " = " & ", " [Aa]nd " = " & ", "Liberal Arts in Extension Studies, field: Data Science" = "Data Science", "Data Science–Computer Science Track" = "Data Science & Computer Science", "Data Science–Statistics Track" = "Data Science & Statistics", " \\(.+" = ""))
+
+unique(as.factor(ds_programs_df$degree))
+ds_programs_df$degree <- ds_programs_df$degree %>% str_replace_all(c("M.I.S.M. " = "M.I.S.M.", "M.S. " = "M.S.", "M.S.E. " = "M.S.E.", "M.S.M. " = "M.S.M.", "Ph.D. " = "Ph.D.", "Master " = "Master", "Specialized Masters " = "Specialized Master"))
+
+ds_programs_df <- mutate(ds_programs_df, "degree" = as.factor(ds_programs_df$degree))
+```
+
+```{r}
+ds_programs_df$field <- ds_programs_df$field %>% str_replace_all(c(".+Business.+" = "Business Analytics", "Business.+" = "Business Analytics", "Customer.+" = "Business Analytics", "Supply.+" = "Business Analytics", ".+Strategic.+" = "Business Analytics", "Strategic.+" = "Business Analytics", ".+Management" = "Business Analytics"))
+
+field_count <- count(ds_programs_df, field) %>% arrange(desc(n))
+
+saveRDS(field_count, "field_count.rds")
+```
+
+```{r}
+#count(str_detect("machine learning"))
+
+#httr_status
+
+test_url <- function(url) {
+ 
+   message(paste0("Testing: ", url))
+ 
+   url_status <- try(httr::GET(url), silent = TRUE)
+ 
+   # Fails if host can't be resolved
+
+   status <- ifelse(suppressMessages(grepl("Could not resolve host", url_status)), "failed", "success")
+ 
+   if (status == "success") {
+
+     # Fails if 404'ed
+
+     status <- ifelse(try(url_status$status_code, silent = TRUE) == 404, "failed", "success")
+
+   }
+ 
+   return(status)
+
+}
+ 
+```
+
+```{r}
+ds_programs_df <- mutate(ds_programs_df, "website_access" = sapply(ds_programs_df$website, test_url))
+ds_programs_df <- mutate(ds_programs_df, "website_access" = as.factor(ds_programs_df$website_access))
+```
+
+```{r}
+summary(ds_programs_df$year)
+ds_programs_df %>% ggplot(aes(year)) + geom_bar() + geom_text(stat = "count", aes(label = after_stat(count)), vjust=-0.3)
+summary(ds_programs_df$degree)
+ds_programs_df %>% ggplot(aes(degree)) + geom_bar() + geom_text(stat = "count", aes(label = after_stat(count)), vjust=-0.3)
+```
+
+```{r}
+ds_programs_df %>% group_by(field) %>% filter(n() > 1) %>% ggplot(aes(field)) + geom_bar() + geom_text(stat = "count", aes(label = after_stat(count)), vjust=-0.3)
+ds_programs_df %>% group_by(field) %>% filter(n() > 3) %>% ggplot(aes(field)) + geom_bar() + geom_text(stat = "count", aes(label = after_stat(count)), vjust=-0.3)
+```
+
+```{r}
+ethics <- sapply(ds_programs_df$website, keyword_count, "ethics")
+
+ds_programs_df2 <- mutate(ds_programs_df, ethics = ethics)
+```
+
+
+```{r}
+keyword_count <- function(url, string) {
+ 
+  attempted_url <- try(download.file(url, destfile = "site", method = "wget", extra = "--no-check-certificate"), silent = TRUE)
+  
+  if(class(attempted_url) != "try-error") {
+  
+    html <- read_html("site")
+  
+    text <- html_text(html)
+  
+    return(str_count(text, string))
+  
+  } else{
+    
+    return(httr::status())
+    
+    }
+  
+}
+```
