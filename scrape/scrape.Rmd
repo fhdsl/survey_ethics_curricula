@@ -124,10 +124,6 @@ saveRDS(field_count, "field_count.rds")
 ```
 
 ```{r}
-#count(str_detect("machine learning"))
-
-#httr_status
-
 test_url <- function(url) {
  
    message(paste0("Testing: ", url))
@@ -170,11 +166,12 @@ ds_programs_df %>% group_by(field) %>% filter(n() > 3) %>% ggplot(aes(field)) + 
 ```
 
 ```{r}
+ethics
+
 ethics <- sapply(ds_programs_df$website, keyword_count, "ethics")
 
-ds_programs_df2 <- mutate(ds_programs_df, ethics = ethics)
+mutate(ds_programs_df, ethics = ethics)
 ```
-
 
 ```{r}
 keyword_count <- function(url, string) {
@@ -191,7 +188,17 @@ keyword_count <- function(url, string) {
   
   } else{
     
-    return(httr::status())
+    error <- try(status_code(GET(url)))
+    
+    if(class(error) != "try-error") {
+      
+      return(paste("ERROR", error))
+      
+    } else{
+      
+      return(NA)
+      
+    }
     
     }
   
