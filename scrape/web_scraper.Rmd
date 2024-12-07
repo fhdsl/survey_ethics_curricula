@@ -106,8 +106,8 @@ ds_programs_df$field <- ds_programs_df$field %>%
   str_remove(regex("( in July.+)"))
 
 #cleaning
-unique(as.factor(ds_programs_df$field))
-ds_programs_df$field <- ds_programs_df$field %>% str_replace_all(c("Data Analytics and Policy\\)" = "Data Analytics and Policy", "\\." = "", " - " = " & ", " – " = " & ", " / " = " & ", " [Aa]nd " = " & ", "Liberal Arts in Extension Studies, field: Data Science" = "Data Science", "Data Science–Computer Science Track" = "Data Science & Computer Science", "Data Science–Statistics Track" = "Data Science & Statistics", " \\(.+" = ""))
+#unique(as.factor(ds_programs_df$field))
+#ds_programs_df$field <- ds_programs_df$field %>% str_replace_all(c("Data Analytics and Policy\\)" = "Data Analytics and Policy", "\\." = "", " - " = " & ", " – " = " & ", " / " = " & ", " [Aa]nd " = " & ", "Liberal Arts in Extension Studies, field: Data Science" = "Data Science", "Data Science–Computer Science Track" = "Data Science & Computer Science", "Data Science–Statistics Track" = "Data Science & Statistics", " \\(.+" = ""))
 
 unique(as.factor(ds_programs_df$degree))
 ds_programs_df$degree <- ds_programs_df$degree %>% str_replace_all(c("M.I.S.M. " = "M.I.S.M.", "M.S. " = "M.S.", "M.S.E. " = "M.S.E.", "M.S.M. " = "M.S.M.", "Ph.D. " = "Ph.D.", "Master " = "Master", "Specialized Masters " = "Specialized Master"))
@@ -116,11 +116,11 @@ ds_programs_df <- mutate(ds_programs_df, "degree" = as.factor(ds_programs_df$deg
 ```
 
 ```{r}
-ds_programs_df$field <- ds_programs_df$field %>% str_replace_all(c(".+Business.+" = "Business Analytics", "Business.+" = "Business Analytics", "Customer.+" = "Business Analytics", "Supply.+" = "Business Analytics", ".+Strategic.+" = "Business Analytics", "Strategic.+" = "Business Analytics", ".+Management" = "Business Analytics"))
+#ds_programs_df$field <- ds_programs_df$field %>% str_replace_all(c(".+Business.+" = "Business Analytics", "Business.+" = "Business Analytics", "Customer.+" = "Business Analytics", "Supply.+" = "Business Analytics", ".+Strategic.+" = "Business Analytics", "Strategic.+" = "Business Analytics", ".+Management" = "Business Analytics"))
 
-field_count <- count(ds_programs_df, field) %>% arrange(desc(n))
+#field_count <- count(ds_programs_df, field) %>% arrange(desc(n))
 
-saveRDS(field_count, "field_count.rds")
+#saveRDS(field_count, "field_count.rds")
 ```
 
 ```{r}
@@ -165,15 +165,10 @@ ds_programs_df %>% group_by(field) %>% filter(n() > 1) %>% ggplot(aes(field)) + 
 ds_programs_df %>% group_by(field) %>% filter(n() > 3) %>% ggplot(aes(field)) + geom_bar() + geom_text(stat = "count", aes(label = after_stat(count)), vjust=-0.3)
 ```
 
-```{r}
-ethics
-
-ethics <- sapply(ds_programs_df$website, keyword_count, "ethics")
-
-mutate(ds_programs_df, ethics = ethics)
-```
 
 ```{r}
+##Kiera code that counts the number of occurrences of a string on a webpage
+
 keyword_count <- function(url, string) {
  
   attempted_url <- try(download.file(url, destfile = "site", method = "wget", extra = "--no-check-certificate"), silent = TRUE)
